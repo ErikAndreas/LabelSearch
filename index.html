@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<link rel="stylesheet" href="sp://import/css/adam.css">	
+	<style type="text/css">
+	div.captionWrapper{  
+		float:left; /* important */  
+		margin: 10px;
+		position:relative;  
+	} 
+	div.captionWrapper a:hover {text-decoration:none;}
+	div.captionDesc{  
+		position:absolute; /* absolute position (so we can position it where we want)*/  
+		bottom:3px; 
+		left:0px;  
+		width:100%;  
+		/* styling below */  
+		background-color:rgba(0,0,0,0.7);  
+		/*font-family: tahoma,arial,sans-serif;  */
+		font-size:9px;  
+		color:white;  
+	} 
+	p.descCon{  
+		padding:5px;  
+		margin:0px;  
+		text-shadow:none;
+	}
+	</style>	
+</head>
+<body onload="init()">
+<h1>Full Label Search</h1>
+<div>Spotify usually never shows more than just a few artists on a label and just lists individual songs, this is a fully browsable list of artist albums.</div>
+<form id="labelSearchForm">
+	Label: <input type="search" style="height:25px;" onkeypress="if (event.keyCode==13){window.location = 'spotify:app:LabelSearch:'+$('#labelSearch').val()+':1';return false;}" name="labelSearch" id="labelSearch"/>
+	<input class="new-button" type="button" onclick="window.location = 'spotify:app:LabelSearch:'+$('#labelSearch').val()+':1';" value=" Search "/>
+</form>	
+<div id="findings" style="float:left"></div>
+<div style="clear:both"></div>
+<div id="lSC" width="680">
+</div>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4/jquery.min.js"></script>
+<script type="text/javascript">
+	var m;
+	function init() {
+		console.log("init()");
+		sp = getSpotifyApi(1);
+		m = sp.require("sp://import/scripts/api/models");
+		console.log('init - arg count '+sp.core.getArguments().length);
+		// args if passed is assumed to be on format spotify:app:LabelSearch:earache:2
+		// where 'earache' is label and '2' is page
+		sp.core.addEventListener("argumentsChanged", function (event) {	
+			console.log('args changed, count ' + sp.core.getArguments().length);			
+			if (2 == sp.core.getArguments().length) {			
+				$('#labelSearch').val(sp.core.getArguments()[0]);
+				doLabelSearch(sp.core.getArguments()[0], sp.core.getArguments()[1]);
+			}
+		});
+		if (2 == sp.core.getArguments().length) {
+			$('#labelSearch').val(sp.core.getArguments()[0]);
+			doLabelSearch(sp.core.getArguments()[0], sp.core.getArguments()[1]);
+		}
+	}
+	
+	function doLabelSearch(label, page) {
+		console.log('doing label search ' + label + ' page ' + page);
+		$.ajax({
+			url: 'http://ws.spotify.com/search/1/album.json?q=label:%22'+label.replace(/&/g,'%26')+'%22&page='+page,
+			success: function(data) {
+	        	handleLabelSearch(data);
+	        },
+			error: function(jXHR, textStatus, errorThrown) {
+				handleError(jXHR, textStatus, errorThrown);				
+			}
+		});
+	}
+	
+	function handleLabelSearch(data) {
+		if (data.info.num_results > 0) {
+			var artist = '';
+			var album = '';
+			var href = '';
+			//var out = '<table><thead><tr><th>Artist</th><th>Album</th></tr></thead>';
+			var out = '';
+			$('#findings').html('');
+			for (j = 0; j < data.albums.length; j++) {				
+				artist = data.albums[j].artists[0].name;
+				album = data.albums[j].name;
+				href = data.albums[j].href.split(":")[2];				
+				//out += "<tr><td><a href='"+ data.albums[j].artists[0].href+"'>"+artist+"</td><td><a href='"+ data.albums[j].href+"'>"+album+"</a></td></tr>";				
+				$('#findings').append('<div class="captionWrapper"><a href="'+data.albums[j].href+'"><img style="width:128px;height:128px" id="newsCover'+data.albums[j].href.split(':')[2]+'"/><div class="captionDesc"><p class="descCon">' + data.albums[j].artists[0].name + ' - ' + data.albums[j].name + '</p></div></a></div>');
+				var al = m.Album.fromURI(data.albums[j].href,function(a){
+					$('#newsCover'+a.data.uri.split(':')[2]).attr('src',a.data.cover);
+				});
+			}
+			//out += "</table>";
+			if (data.info.page > 1) {
+				out += "<a href='#' onclick='window.location = \"spotify:app:LabelSearch:"+$('#labelSearch').val()+":"+(data.info.page - 1)+"\";return false;'>Prev</a>&nbsp;";
+			}
+			if (Math.ceil(data.info.num_results/data.info.limit) > 1) {
+				for (k = 0; k < Math.ceil(data.info.num_results/data.info.limit); k++) {
+					if (data.info.page != (k+1)) {
+						out += "<a href='#' onclick='window.location = \"spotify:app:LabelSearch:"+$('#labelSearch').val()+":"+(k + 1)+"\";return false;'>"+(k+1)+"</a>&nbsp;";
+					} else {
+						out += (k+1) + "&nbsp;";
+					}
+				}
+			}			
+			if (data.info.num_results > data.info.limit && data.info.page < (Math.ceil(data.info.num_results/data.info.limit))) {
+				out += "<a href='#' onclick='window.location = \"spotify:app:LabelSearch:"+$('#labelSearch').val()+":"+(data.info.page + 1)+"\";return false;'>Next</a>";
+			}
+			$('#lSC').html(out);
+		} else {
+			$('#lSC').html('No results');
+		}
+	}	
+	
+	function handleError(jXHR, textStatus, errorThrown) {			
+		console.error("Error calling server, status: " + jXHR.status + " textstatus: " + textStatus);
+	}	
+</script>
+</body>
+</html> 

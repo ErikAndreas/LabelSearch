@@ -1,0 +1,26 @@
+{
+	"BundleType": "Application",
+	"BundleIdentifier": "LabelSearch",
+	"RequiredInterface": "1",
+	"RequiredPermissions": [
+		"http://ws.spotify.com",
+		"http://ajax.googleapis.com"
+	],
+	"AppDescription": "Full Label Search showing all results",
+	"AppName": {
+		"en": "Label Search"
+	},
+	"SupportedLanguages": [
+        	"en"
+	],
+	"VendorIdentifier" : "se.nyhren",
+	"BundleIdentifier": "LabelSearch",
+	"BundleType": "Application",
+	"RequiredInterface": "1",
+	"VendorIdentifier" : "se.nyhren",
+	"AppIcon" : { 
+		"18x18":"18x18.png",
+		"64x64":"64x64.png",
+		"128x128":"128x128.png"
+	}
+}
