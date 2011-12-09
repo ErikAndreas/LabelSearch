@@ -42,10 +42,12 @@
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4/jquery.min.js"></script>
 <script type="text/javascript">
 	var m;
+	var userCountry;
 	function init() {
 		console.log("init()");
 		sp = getSpotifyApi(1);
 		m = sp.require("sp://import/scripts/api/models");
+		userCountry = sp.core.country;
 		console.log('init - arg count '+sp.core.getArguments().length);
 		// args if passed is assumed to be on format spotify:app:LabelSearch:earache:2
 		// where 'earache' is label and '2' is page
@@ -75,6 +77,9 @@
 		});
 	}
 	
+	// since using checkAvail page will contain varying #albums
+	// fetch all hits to own set and roll own pagination + allow for client sorting?
+	// http://stackoverflow.com/questions/979256/how-to-sort-an-array-of-javascript-objects
 	function handleLabelSearch(data) {
 		if (data.info.num_results > 0) {
 			var artist = '';
@@ -83,15 +88,17 @@
 			//var out = '<table><thead><tr><th>Artist</th><th>Album</th></tr></thead>';
 			var out = '';
 			$('#findings').html('');
-			for (j = 0; j < data.albums.length; j++) {				
-				artist = data.albums[j].artists[0].name;
-				album = data.albums[j].name;
-				href = data.albums[j].href.split(":")[2];				
-				//out += "<tr><td><a href='"+ data.albums[j].artists[0].href+"'>"+artist+"</td><td><a href='"+ data.albums[j].href+"'>"+album+"</a></td></tr>";				
-				$('#findings').append('<div class="captionWrapper"><a href="'+data.albums[j].href+'"><img style="width:128px;height:128px" id="newsCover'+data.albums[j].href.split(':')[2]+'"/><div class="captionDesc"><p class="descCon">' + data.albums[j].artists[0].name + ' - ' + data.albums[j].name + '</p></div></a></div>');
-				var al = m.Album.fromURI(data.albums[j].href,function(a){
-					$('#newsCover'+a.data.uri.split(':')[2]).attr('src',a.data.cover);
-				});
+			for (j = 0; j < data.albums.length; j++) {	
+				if (checkAvail(data.albums[j].availability.territories)) {
+					artist = data.albums[j].artists[0].name;
+					album = data.albums[j].name;
+					href = data.albums[j].href.split(":")[2];				
+					//out += "<tr><td><a href='"+ data.albums[j].artists[0].href+"'>"+artist+"</td><td><a href='"+ data.albums[j].href+"'>"+album+"</a></td></tr>";				
+					$('#findings').append('<div class="captionWrapper"><a href="'+data.albums[j].href+'"><img style="width:128px;height:128px" id="newsCover'+data.albums[j].href.split(':')[2]+'"/><div class="captionDesc"><p class="descCon">' + data.albums[j].artists[0].name + ' - ' + data.albums[j].name + '</p></div></a></div>');
+					var al = m.Album.fromURI(data.albums[j].href,function(a){
+						$('#newsCover'+a.data.uri.split(':')[2]).attr('src',a.data.cover);
+					});
+				}
 			}
 			//out += "</table>";
 			if (data.info.page > 1) {
@@ -113,6 +120,10 @@
 		} else {
 			$('#lSC').html('No results');
 		}
+	}
+
+	function checkAvail(cs) {
+		return cs.indexOf(userCountry) >= 0 || cs == 'worldwide';
 	}	
 	
 	function handleError(jXHR, textStatus, errorThrown) {			
