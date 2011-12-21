@@ -34,6 +34,7 @@
 Label: <input type="text" class="mf" onkeypress="if (event.keyCode==13){LS.setSearch($('#labelSearch').val());return false;}" name="labelSearch" id="labelSearch"/>
 <button class="new-button" onclick="LS.setSearch($('#labelSearch').val());return false;">Search</button>
 <div id="sortOptions">
+Sort by:
 	<button class="new-button" onclick="LS.setSort(LS.SortBy.POPULARITY);">Popularity</button>
 	<button class="new-button" onclick="LS.setSort(LS.SortBy.ARTIST);">Artist</button>
 	<button class="new-button" onclick="LS.setSort(LS.SortBy.ALBUM);">Album</button>
@@ -56,7 +57,12 @@ Label: <input type="text" class="mf" onkeypress="if (event.keyCode==13){LS.setSe
 			console.log('args changed, count ' + LS.sp.core.getArguments().length);			
 			if (2 == LS.sp.core.getArguments().length) {			
 				$('#labelSearch').val(LS.sp.core.getArguments()[0]);
-				LS.bootStrap(LS.sp.core.getArguments()[0], LS.sp.core.getArguments()[1]);
+				if (LS.sp.core.getArguments()[0] == LS.state.label) {
+					LS.state.page = LS.sp.core.getArguments()[1];
+					LS.render();
+				} else {
+					LS.bootStrap(LS.sp.core.getArguments()[0], LS.sp.core.getArguments()[1]);
+				}
 			}
 		});
 		if (2 == LS.sp.core.getArguments().length) {
@@ -134,7 +140,7 @@ var LS = {
 				artist = data.albums[j].artists[0].name;
 				album = data.albums[j].name;
 				popularity = data.albums[j].popularity;
-				href = data.albums[j].href.split;
+				href = data.albums[j].href;
 				avail = data.albums[j].availability.territories;
 				LS.state.results.push({'artist':artist,'album':album,'popularity':popularity,'href':href,'avail':avail});				
 			}
@@ -146,7 +152,7 @@ var LS = {
 				LS.render(); // TODO: print should keep sortby setting and reset
 				$('#status').html('fetched '+LS.state.results.length +'/'+data.info.num_results);
 				if (LS.state.results.length < data.info.num_results){
-					$('#status').append('<button onclick="LS.doLabelSearch('+(data.info.page + 1)+')">fetch more</button>');
+					$('#status').append('<button class="new-button" onclick="LS.doLabelSearch('+(data.info.page + 1)+')">fetch more</button>');
 				} else {
 					$('#status').html('');
 				}
@@ -170,7 +176,7 @@ var LS = {
 		// TODO: add avail check
 		for (i=LS.state.page*LS.PAGE_SIZE; i < (LS.state.page*LS.PAGE_SIZE + LS.PAGE_SIZE) &&  i < LS.state.results.length;i++) {
 			//$('#findings').append(LS.state.results[i].artist + ' - ' + LS.state.results[i].album + '<br/>');
-			$('#findings').append('<div class="captionWrapper"><a href="'+LS.state.results[i].href+'"><img style="width:128px;height:128px" id="newsCover'+LS.state.results[i].href.split(':')[2]+'"/><div class="captionDesc"><p class="descCon">' + LS.state.results[i].artists[0].name + ' - ' + LS.state.results[i].name + '</p></div></a></div>');
+			$('#findings').append('<div class="captionWrapper"><a href="'+LS.state.results[i].href+'"><img style="width:128px;height:128px" id="newsCover'+LS.state.results[i].href.split(':')[2]+'"/><div class="captionDesc"><p class="descCon">' + LS.state.results[i].artist + ' - ' + LS.state.results[i].album + '</p></div></a></div>');
 			var al = LS.m.Album.fromURI(LS.state.results[i].href,function(a){
 				$('#newsCover'+a.data.uri.split(':')[2]).attr('src',a.data.cover);
 			});
