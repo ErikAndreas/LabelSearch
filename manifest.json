@@ -1,12 +1,15 @@
 {
 	"BundleType": "Application",
 	"BundleIdentifier": "LabelSearch",
+	"BundleVersion": "0.1",
 	"RequiredInterface": "1",
 	"RequiredPermissions": [
 		"http://ws.spotify.com",
 		"http://ajax.googleapis.com"
 	],
-	"AppDescription": "Full Label Search showing all results",
+	"AppDescription": { 
+		"en": "Full Label Search showing all results"
+	},
 	"AppName": {
 		"en": "Label Search"
 	},

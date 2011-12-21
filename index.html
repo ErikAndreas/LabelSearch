@@ -26,98 +26,190 @@
 		margin:0px;  
 		text-shadow:none;
 	}
+	input.mf {height:20px;}
 	</style>	
 </head>
 <body onload="init()">
-<h1>Full Label Search</h1>
-<div>Spotify usually never shows more than just a few artists on a label and just lists individual songs, this is a fully browsable list of artist albums.</div>
-<form id="labelSearchForm">
-	Label: <input type="search" style="height:25px;" onkeypress="if (event.keyCode==13){window.location = 'spotify:app:LabelSearch:'+$('#labelSearch').val()+':1';return false;}" name="labelSearch" id="labelSearch"/>
-	<input class="new-button" type="button" onclick="window.location = 'spotify:app:LabelSearch:'+$('#labelSearch').val()+':1';" value=" Search "/>
-</form>	
+<h1 id="header">Search</h1>
+Label: <input type="text" class="mf" onkeypress="if (event.keyCode==13){LS.setSearch($('#labelSearch').val());return false;}" name="labelSearch" id="labelSearch"/>
+<button class="new-button" onclick="LS.setSearch($('#labelSearch').val());return false;">Search</button>
+<div id="sortOptions">
+	<button class="new-button" onclick="LS.setSort(LS.SortBy.POPULARITY);">Popularity</button>
+	<button class="new-button" onclick="LS.setSort(LS.SortBy.ARTIST);">Artist</button>
+	<button class="new-button" onclick="LS.setSort(LS.SortBy.ALBUM);">Album</button>
+</div>
+<div id="status"></div>
+<div id="pagination"></div>
 <div id="findings" style="float:left"></div>
 <div style="clear:both"></div>
-<div id="lSC" width="680">
-</div>
+
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4/jquery.min.js"></script>
 <script type="text/javascript">
-	var m;
 	function init() {
 		console.log("init()");
-		sp = getSpotifyApi(1);
-		m = sp.require("sp://import/scripts/api/models");
-		console.log('init - arg count '+sp.core.getArguments().length);
+		LS.sp = getSpotifyApi(1);
+		LS.m = LS.sp.require("sp://import/scripts/api/models");
+		console.log('init - arg count '+LS.sp.core.getArguments().length);
 		// args if passed is assumed to be on format spotify:app:LabelSearch:earache:2
 		// where 'earache' is label and '2' is page
-		sp.core.addEventListener("argumentsChanged", function (event) {	
-			console.log('args changed, count ' + sp.core.getArguments().length);			
-			if (2 == sp.core.getArguments().length) {			
-				$('#labelSearch').val(sp.core.getArguments()[0]);
-				doLabelSearch(sp.core.getArguments()[0], sp.core.getArguments()[1]);
+		LS.sp.core.addEventListener("argumentsChanged", function (event) {	
+			console.log('args changed, count ' + LS.sp.core.getArguments().length);			
+			if (2 == LS.sp.core.getArguments().length) {			
+				$('#labelSearch').val(LS.sp.core.getArguments()[0]);
+				LS.bootStrap(LS.sp.core.getArguments()[0], LS.sp.core.getArguments()[1]);
 			}
 		});
-		if (2 == sp.core.getArguments().length) {
-			$('#labelSearch').val(sp.core.getArguments()[0]);
-			doLabelSearch(sp.core.getArguments()[0], sp.core.getArguments()[1]);
+		if (2 == LS.sp.core.getArguments().length) {
+			$('#labelSearch').val(LS.sp.core.getArguments()[0]);
+			LS.bootStrap(LS.sp.core.getArguments()[0], LS.sp.core.getArguments()[1]);
 		}
 	}
 	
-	function doLabelSearch(label, page) {
-		console.log('doing label search ' + label + ' page ' + page);
+var LS = {
+	// max number of calls to make consequencial to spotify before showing 'fetch more'
+	CALLS_LIMIT: 20,
+	// albums per page view
+	PAGE_SIZE: 100,
+	userCountry: 'SE',	
+	m:'',
+	sp:'',
+	state: {
+		results: [],
+		label: '',
+		sortby: '',
+		page: 0
+	},
+	// values must match fields in LS.state.results
+	SortBy: {
+		POPULARITY: 'popularity',
+		ARTIST: 'artist',
+		ALBUM: 'album'
+	},	
+	// "api"
+	bootStrap: function(label, page) {
+		LS.state.page = page;
+		LS.state.label = label;
+		LS.doLabelSearch(1);
+	},
+	setSearch: function(label) {
+		LS.state.page = 0;
+		LS.state.label = label;
+		LS.doLabelSearch(1);
+	},
+	setSort: function(sort) {
+		LS.state.sortby = sort;
+		LS.render();
+	},
+	setPage: function(page) {
+		LS.state.page = page;
+		//LS.render();
+		window.location = 'spotify:app:labelsearch:'+LS.state.label+':'+LS.state.page;
+	},
+	// "private"
+	doLabelSearch: function(sppage) {
+		if (1 == sppage) {
+			LS.state.results = [];
+			$('#findings').html('');
+			$('#pagination').html('');
+		}
+		console.log('doing label search ' + LS.state.label + ' page ' + sppage);
 		$.ajax({
-			url: 'http://ws.spotify.com/search/1/album.json?q=label:%22'+label.replace(/&/g,'%26')+'%22&page='+page,
+			url: 'http://ws.spotify.com/search/1/album.json?q=label:%22'+LS.state.label.replace(/&/g,'%26')+'%22&page='+sppage,
 			success: function(data) {
-	        	handleLabelSearch(data);
+	        	LS.handleLabelSearch(data);
 	        },
 			error: function(jXHR, textStatus, errorThrown) {
-				handleError(jXHR, textStatus, errorThrown);				
+				LS.handleError(jXHR, textStatus, errorThrown);				
 			}
 		});
-	}
-	
-	function handleLabelSearch(data) {
+	},
+	handleLabelSearch: function(data) {
 		if (data.info.num_results > 0) {
 			var artist = '';
 			var album = '';
 			var href = '';
-			//var out = '<table><thead><tr><th>Artist</th><th>Album</th></tr></thead>';
 			var out = '';
-			$('#findings').html('');
-			for (j = 0; j < data.albums.length; j++) {				
+			$('#status').html('fetching ' + (data.info.page)*data.info.limit +'/'+data.info.num_results);
+			for (j = 0; j < data.albums.length; j++) {		
 				artist = data.albums[j].artists[0].name;
 				album = data.albums[j].name;
-				href = data.albums[j].href.split(":")[2];				
-				//out += "<tr><td><a href='"+ data.albums[j].artists[0].href+"'>"+artist+"</td><td><a href='"+ data.albums[j].href+"'>"+album+"</a></td></tr>";				
-				$('#findings').append('<div class="captionWrapper"><a href="'+data.albums[j].href+'"><img style="width:128px;height:128px" id="newsCover'+data.albums[j].href.split(':')[2]+'"/><div class="captionDesc"><p class="descCon">' + data.albums[j].artists[0].name + ' - ' + data.albums[j].name + '</p></div></a></div>');
-				var al = m.Album.fromURI(data.albums[j].href,function(a){
-					$('#newsCover'+a.data.uri.split(':')[2]).attr('src',a.data.cover);
-				});
+				popularity = data.albums[j].popularity;
+				href = data.albums[j].href.split;
+				avail = data.albums[j].availability.territories;
+				LS.state.results.push({'artist':artist,'album':album,'popularity':popularity,'href':href,'avail':avail});				
 			}
-			//out += "</table>";
-			if (data.info.page > 1) {
-				out += "<a href='#' onclick='window.location = \"spotify:app:LabelSearch:"+$('#labelSearch').val()+":"+(data.info.page - 1)+"\";return false;'>Prev</a>&nbsp;";
-			}
-			if (Math.ceil(data.info.num_results/data.info.limit) > 1) {
-				for (k = 0; k < Math.ceil(data.info.num_results/data.info.limit); k++) {
-					if (data.info.page != (k+1)) {
-						out += "<a href='#' onclick='window.location = \"spotify:app:LabelSearch:"+$('#labelSearch').val()+":"+(k + 1)+"\";return false;'>"+(k+1)+"</a>&nbsp;";
-					} else {
-						out += (k+1) + "&nbsp;";
-					}
+			// api limits to 20 calls within short period of time
+			if (data.info.num_results > data.info.limit && data.info.page < (Math.ceil(data.info.num_results/data.info.limit)) && (LS.state.results.length % (LS.CALLS_LIMIT*data.info.limit)) != 0) {
+				//var t = setTimeout(function(){doLabelSearch(label, data.info.page + 1)},250);
+				LS.doLabelSearch(data.info.page + 1);
+			} else {
+				LS.render(); // TODO: print should keep sortby setting and reset
+				$('#status').html('fetched '+LS.state.results.length +'/'+data.info.num_results);
+				if (LS.state.results.length < data.info.num_results){
+					$('#status').append('<button onclick="LS.doLabelSearch('+(data.info.page + 1)+')">fetch more</button>');
+				} else {
+					$('#status').html('');
 				}
-			}			
-			if (data.info.num_results > data.info.limit && data.info.page < (Math.ceil(data.info.num_results/data.info.limit))) {
-				out += "<a href='#' onclick='window.location = \"spotify:app:LabelSearch:"+$('#labelSearch').val()+":"+(data.info.page + 1)+"\";return false;'>Next</a>";
 			}
-			$('#lSC').html(out);
 		} else {
-			$('#lSC').html('No results');
+			$('#findings').html('No results');
 		}
-	}	
-	
-	function handleError(jXHR, textStatus, errorThrown) {			
+	},
+	render: function() {
+		if (true) {
+			$('#pagination').html('');
+			$('#findings').html('');
+		}
+		if (LS.SortBy.POPULARITY == LS.state.sortby) {
+			LS.state.results.sort(Utils.sort_by(LS.SortBy.POPULARITY, true, parseFloat));
+		} else if (LS.SortBy.ARTIST ==  LS.state.sortby) {
+			LS.state.results.sort(Utils.sort_by(LS.SortBy.ARTIST, false, function(a){return a.toUpperCase()}));
+		} else if (LS.SortBy.ALBUM ==  LS.state.sortby) {
+			LS.state.results.sort(Utils.sort_by(LS.SortBy.ALBUM, false, function(a){return a.toUpperCase()}));
+		}
+		// TODO: add avail check
+		for (i=LS.state.page*LS.PAGE_SIZE; i < (LS.state.page*LS.PAGE_SIZE + LS.PAGE_SIZE) &&  i < LS.state.results.length;i++) {
+			//$('#findings').append(LS.state.results[i].artist + ' - ' + LS.state.results[i].album + '<br/>');
+			$('#findings').append('<div class="captionWrapper"><a href="'+LS.state.results[i].href+'"><img style="width:128px;height:128px" id="newsCover'+LS.state.results[i].href.split(':')[2]+'"/><div class="captionDesc"><p class="descCon">' + LS.state.results[i].artists[0].name + ' - ' + LS.state.results[i].name + '</p></div></a></div>');
+			var al = LS.m.Album.fromURI(LS.state.results[i].href,function(a){
+				$('#newsCover'+a.data.uri.split(':')[2]).attr('src',a.data.cover);
+			});
+			
+		}
+		if (LS.state.page > 0) {
+			$('#pagination').append('<a href="#" onclick="LS.setPage('+(LS.state.page-1)+');return false;">Prev</a> ');
+		}
+		if (Math.ceil(LS.state.results.length/LS.PAGE_SIZE) > 1) {
+			for (k = 0; k < Math.ceil(LS.state.results.length/LS.PAGE_SIZE); k++) {
+				if (LS.state.page != (k)) {
+					$('#pagination').append('<a href="#" onclick="LS.setPage('+(k)+');return false;">'+(k + 1)+ "</a> ");
+				} else {
+					$('#pagination').append((k+1) + " ");
+				}
+			}
+		}			
+		if (LS.state.results.length > LS.PAGE_SIZE && LS.state.page+1 < (Math.ceil(LS.state.results.length/LS.PAGE_SIZE))) {
+			$('#pagination').append('<a href="#" onclick="LS.setPage('+(LS.state.page+1)+');return false;">Next</a>');
+		}
+	},
+	handleError: function(jXHR, textStatus, errorThrown) {			
 		console.error("Error calling server, status: " + jXHR.status + " textstatus: " + textStatus);
-	}	
+	},
+	checkAvail: function(cs) {
+		return cs.indexOf(userCountry) >= 0 || cs == 'worldwide';
+	}
+};
+		
+var Utils = {
+	sort_by: function(field, reverse, primer) {
+		var key = function (x) {return primer ? primer(x[field]) : x[field]};
+		return function (a,b) {
+			var A = key(a), B = key(b);
+			return (A < B ? -1 : (A > B ? 1 : 0)) * [1,-1][+!!reverse];                 
+		}
+	}
+};		
+
 </script>
 </body>
 </html> 
