@@ -54,7 +54,7 @@ Sort by:
 		// args if passed is assumed to be on format spotify:app:LabelSearch:earache:2
 		// where 'earache' is label and '2' is page
 		LS.sp.core.addEventListener("argumentsChanged", function (event) {	
-			console.log('args changed, count ' + LS.sp.core.getArguments().length);			
+			console.log('args changed, count ' + LS.sp.core.getArguments());			
 			if (2 == LS.sp.core.getArguments().length) {			
 				$('#labelSearch').val(LS.sp.core.getArguments()[0]);
 				if (LS.sp.core.getArguments()[0] == LS.state.label) {
@@ -99,8 +99,9 @@ var LS = {
 	},
 	setSearch: function(label) {
 		LS.state.page = 0;
-		LS.state.label = label;
-		LS.doLabelSearch(1);
+		//LS.state.label = label;
+		window.location = 'spotify:app:labelsearch:'+label+':'+LS.state.page;
+		//LS.doLabelSearch(1);
 	},
 	setSort: function(sort) {
 		LS.state.sortby = sort;
@@ -159,6 +160,7 @@ var LS = {
 			}
 		} else {
 			$('#findings').html('No results');
+			$('#status').html('');
 		}
 	},
 	render: function() {
